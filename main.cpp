@@ -6,37 +6,56 @@
 
 namespace Keywords {
     const QString t = "t";
+    const QString type = "type";
     const QString w = "width";
     const QString h = "height";
     const QString rgb = "rgb";
+    const QString act = "act";
 }
 
-struct RGBParams {
+enum class PatternType {
+    RGB,
+    ACT,
+    UNKNOWN
+};
+
+struct SizeParams {
     int rows = 0;
     int columns = 0;
 };
 
-RGBParams getRGBType(const QString& rgbStr, bool& ok) {
-    ok = false;
-    RGBParams result;
-    if (!rgbStr.startsWith(Keywords::rgb)) {
-        return result;
+bool tryParsePattern(const QString& str, const QString& expectedPrefix, SizeParams& size) {
+    if (!str.startsWith(expectedPrefix, Qt::CaseInsensitive)) {
+        return false;
     }
 
-    QStringList args = rgbStr.mid(Keywords::rgb.size()).split("x", Qt::SkipEmptyParts);
+    QStringList args = str.mid(expectedPrefix.size()).split("x", Qt::SkipEmptyParts);
     if (args.size() != 2) {
-        return result;
+        return false;
     }
 
-    result.columns = args.at(0).toInt(&ok);
-    if (!ok || result.columns <= 0) {
-        return result;
+    bool ok = true;
+    size.columns = args.at(0).toInt(&ok);
+    if (!ok || size.columns <= 0) {
+        return false;
     }
 
-    result.rows = args.at(1).toInt(&ok);
-    ok &= result.rows > 0;
-    return result;
+    size.rows = args.at(1).toInt(&ok);
+    return ok && size.rows > 0;
 };
+
+PatternType getPatternType(const QString& str, SizeParams& size) {
+    static const auto patternMap = std::vector<std::pair<QString, PatternType>>{
+        {Keywords::rgb, PatternType::RGB}, {Keywords::act, PatternType::ACT}
+    };
+
+    for (const auto& pair : patternMap) {
+        if (tryParsePattern(str, pair.first, size)) {
+            return pair.second;
+        }
+    }
+    return PatternType::UNKNOWN;
+}
 
 int main(int argc, char *argv[])
 {
@@ -44,7 +63,7 @@ int main(int argc, char *argv[])
     QGuiApplication::setApplicationName("CalibrationImageFactory");
     QGuiApplication::setApplicationVersion("1.0");
 
-    QString type = "rgb3x4";
+    QString typeStr = "rgb3x4";
     int width = 3840;
     int height = 2880;
 
@@ -54,7 +73,7 @@ int main(int argc, char *argv[])
     parser.addVersionOption();
 
     parser.addPositionalArgument("destination", "File path to save image e.g /path/logo.png");
-    parser.addOption({Keywords::t, QString{"Calibration image type. Format 'rgbCxR' C - columns, R - rows. Default %1"}.arg(type), "string", type});
+    parser.addOption({{Keywords::t, Keywords::type}, QString{"Calibration image type. Format 'rgbCxR' C - columns, R - rows. Default %1"}.arg(typeStr), "string", typeStr});
     parser.addOption({Keywords::w, QString{"Calibration image width > 0. Default %1"}.arg(width), "positive int", QString::number(width)});
     parser.addOption({Keywords::h, QString{"Calibration image height > 0. Default %1"}.arg(height), "positive int", QString::number(height)});
     parser.process(app);
@@ -77,20 +96,29 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    type = parser.value(Keywords::t);
-    bool rgbOk = true;
-    RGBParams rgb = getRGBType(type, rgbOk);
     const QString filePath = parser.positionalArguments().at(0);
+    SizeParams size;
+    auto type = getPatternType(parser.value(Keywords::t), size);
+    switch (type) {
+        case PatternType::ACT:
+            if (!CalibrationFactory::makeACT(filePath, width, height, size.rows, size.columns)) {
+                qWarning() << "ACT image creation failed";
+                return EXIT_FAILURE;
+            }
+            break;
 
-    if (rgbOk) {
-        if (!CalibrationFactory::makeRGB(filePath, width, height, rgb.rows, rgb.columns)) {
-            qWarning() << "RGB image creation failed";
+        case PatternType::RGB:
+            if (!CalibrationFactory::makeRGB(filePath, width, height, size.rows, size.columns)) {
+                qWarning() << "RGB image creation failed";
+                return EXIT_FAILURE;
+            }
+            break;
+
+        default:
+            qWarning() << "Bad calibration type provided";
             return EXIT_FAILURE;
-        }
-        qDebug() << "Success. Please find rgb image at " << filePath;
-        return EXIT_SUCCESS;
     }
 
-    qWarning() << "Bad calibration type provided";
-    return EXIT_FAILURE;
+    qDebug() << "Success. Please find image at " << filePath;
+    return EXIT_SUCCESS;
 }
