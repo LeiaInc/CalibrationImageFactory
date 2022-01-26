@@ -11,11 +11,13 @@ namespace Keywords {
     const QString h = "height";
     const QString rgb = "rgb";
     const QString act = "act";
+    const QString abar = "abar";
 }
 
 enum class PatternType {
     RGB,
     ACT,
+    ALIGN_BAR,
     UNKNOWN
 };
 
@@ -46,7 +48,8 @@ bool tryParsePattern(const QString& str, const QString& expectedPrefix, SizePara
 
 PatternType getPatternType(const QString& str, SizeParams& size) {
     static const auto patternMap = std::vector<std::pair<QString, PatternType>>{
-        {Keywords::rgb, PatternType::RGB}, {Keywords::act, PatternType::ACT}
+        {Keywords::rgb, PatternType::RGB}, {Keywords::act, PatternType::ACT},
+        {Keywords::abar, PatternType::ALIGN_BAR}
     };
 
     for (const auto& pair : patternMap) {
@@ -73,7 +76,7 @@ int main(int argc, char *argv[])
     parser.addVersionOption();
 
     parser.addPositionalArgument("destination", "File path to save image e.g /path/logo.png");
-    parser.addOption({{Keywords::t, Keywords::type}, QString{"Calibration image type. Format 'rgbCxR' C - columns, R - rows. Default %1"}.arg(typeStr), "string", typeStr});
+    parser.addOption({{Keywords::t, Keywords::type}, QString{"Calibration image type. Format '{%1, %2, %3}CxR' C - columns, R - rows. Default %4"}.arg(Keywords::rgb, Keywords::act, Keywords::abar, typeStr), "string", typeStr});
     parser.addOption({Keywords::w, QString{"Calibration image width > 0. Default %1"}.arg(width), "positive int", QString::number(width)});
     parser.addOption({Keywords::h, QString{"Calibration image height > 0. Default %1"}.arg(height), "positive int", QString::number(height)});
     parser.process(app);
@@ -110,6 +113,13 @@ int main(int argc, char *argv[])
         case PatternType::RGB:
             if (!CalibrationFactory::makeRGB(filePath, width, height, size.rows, size.columns)) {
                 qWarning() << "RGB image creation failed";
+                return EXIT_FAILURE;
+            }
+            break;
+
+        case PatternType::ALIGN_BAR:
+            if (!CalibrationFactory::makeABar(filePath, width, height, size.rows, size.columns)) {
+                qWarning() << "Alignment bar image creation failed";
                 return EXIT_FAILURE;
             }
             break;
