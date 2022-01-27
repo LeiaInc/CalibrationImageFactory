@@ -15,9 +15,9 @@ namespace Keywords {
 }
 
 enum class PatternType {
-    RGB,
-    ACT,
-    ALIGN_BAR,
+    RGB = CalibrationFactory::PatternType::RGB,
+    ACT = CalibrationFactory::PatternType::ACT,
+    ALIGN_BAR = CalibrationFactory::PatternType::ALIGN_BAR,
     UNKNOWN
 };
 

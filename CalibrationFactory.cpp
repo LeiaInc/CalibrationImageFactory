@@ -12,11 +12,7 @@ namespace {
 const std::vector<QColor> RGB_SET = {
     QColor{Qt::red},
     QColor{Qt::green},
-    QColor{Qt::blue},
-    QColor{Qt::yellow},
-    QColor{Qt::magenta},
-    QColor{Qt::gray},
-    QColor{Qt::cyan}
+    QColor{Qt::blue}
 };
 
 const std::vector<QColor> ACT_SET = {
@@ -36,11 +32,11 @@ std::vector<QColor> getColorsSet(const std::vector<QColor>& predefined, size_t s
     return colorSet;
 }
 
-void drawMatrix(QPainter& painter, const QRectF& boundRect, size_t matrixSize, const QString& text)
+void drawRGBMatrix(QPainter& painter, const QRectF& boundRect, size_t matrixSize, const QString& text)
 {
     const qreal rows = matrixSize;
     const qreal columns = matrixSize;
-    const qreal textPixelSize = 90;
+    const qreal textPixelSize = qMax(5.0, qMin(90.0, qMin(boundRect.width(), boundRect.height()) / (matrixSize * 2 - 1)));
     qreal xOffset = 0;
     qreal yOffset = 0;
 
@@ -64,13 +60,22 @@ void drawMatrix(QPainter& painter, const QRectF& boundRect, size_t matrixSize, c
                             textSize, textSize};
 
             painter.setBrush(QBrush{Qt::black});
-            int allign = Qt::AlignCenter;
-            if (j == 0) {
-                allign = Qt::AlignLeft | Qt::AlignVCenter;
-            } else if (j == columns - 1) {
-                allign = Qt::AlignRight | Qt::AlignVCenter;
+            int allignV = Qt::AlignVCenter;
+            int allignH = Qt::AlignHCenter;
+
+            if (i == 0) {
+                allignV = Qt::AlignTop;
+            } else if (i == rows - 1) {
+                allignV = Qt::AlignBottom;
             }
-            painter.drawText(textRect, allign, text);
+
+            if (j == 0) {
+                allignH = Qt::AlignLeft;
+            } else if (j == columns - 1) {
+                allignH = Qt::AlignRight;
+            }
+
+            painter.drawText(textRect, allignH | allignV, text);
         }
     }
 }
@@ -96,7 +101,7 @@ bool makeRGBImpl(QImage& image, int rows, int columns)
         xOffset += width;
     }
 
-    const auto margin = 20;
+    const auto margin = 5;
     const qreal cellWidth = imageWidth / columns;
     const qreal cellHeight = imageHeight / rows;
     const auto innerMatrixSize = 3;
@@ -111,7 +116,7 @@ bool makeRGBImpl(QImage& image, int rows, int columns)
         for (int j = 0; j < columns; ++j) {
             xOffset = j * cellWidth + margin;
 
-            drawMatrix(painter,
+            drawRGBMatrix(painter,
                        {xOffset, yOffset, cellWidth - margin * 2 , cellHeight - margin * 2},
                        innerMatrixSize, QString::number(value++));
         }
@@ -152,38 +157,36 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     const qreal stripeHeight = imageHeight / stripesNumber;
     const qreal pinHeight = stripeHeight * pinHeightRatio;
     const qreal pinYOffset = stripeHeight * (1 - pinHeightRatio) / 2;
-    const qreal hOffset = qMax(qMin(75.0, imageWidth / columns / 4), 1.5 * pinWidth);
-    const qreal startX = imageHeight / columns / 2 - hOffset;
+
+    const qreal lbound = 0.15;
+    const qreal ubound = 0.85;
+    const qreal hDelta = (imageWidth - pinWidth * 2) / columns * (ubound - lbound) / (rows * columns);
 
     qreal yOffset = 0;
-    qreal xOffset = 0;
-    for (int i = 0; i < stripesNumber; ++i) {
-        yOffset = i * stripeHeight + pinYOffset;
-        xOffset = startX + i / ACT_SET.size() * hOffset;
-        for (int j = 0; j < columns; ++j) {
-            if (xOffset < pinWidthHalf) {
-                xOffset += imageWidth;
+    qreal xOffset = lbound * imageWidth / columns;
+    unsigned counter = 0;
+
+    for (int i = 0; i < rows; ++i) {
+        yOffset = i * stripeHeight * ACT_SET.size();
+
+        for(int j = 0; j < columns; ++j) {
+            xOffset = pinWidth + lbound * imageWidth / columns + counter++ * hDelta + j * imageWidth / columns;
+            const qreal xPos = qBound(pinWidthHalf, xOffset, imageWidth - pinWidth);
+
+            for (int k = 0; k < static_cast<int>(ACT_SET.size()); ++k) {
+                painter.setBrush(QBrush{QColor{0, 255, 0}});
+                QRectF pinRect{xPos - pinWidthHalf, yOffset + pinYOffset + stripeHeight * k, pinWidth, pinHeight};
+                painter.drawRect(pinRect);
+
+                QLinearGradient gradient {pinRect.topLeft(), pinRect.bottomRight()};
+                gradient.setColorAt(0, Qt::transparent);
+                gradient.setColorAt(1, Qt::black);
+
+                QBrush gradientBrush{gradient};
+                gradientBrush.setStyle(Qt::BrushStyle::LinearGradientPattern);
+                painter.setBrush(gradientBrush);
+                painter.drawRect(pinRect);
             }
-
-            if (xOffset > imageWidth) {
-                xOffset -= imageWidth;
-            }
-
-            xOffset = qBound(pinWidthHalf, xOffset, imageWidth - pinWidth);
-            painter.setBrush(QBrush{QColor{0, 255, 0}});
-            QRectF pinRect{xOffset - pinWidthHalf, yOffset, pinWidth, pinHeight};
-            painter.drawRect(pinRect);
-
-            QLinearGradient gradient {pinRect.topLeft(), pinRect.bottomRight()};
-            gradient.setColorAt(0, Qt::transparent);
-            gradient.setColorAt(1, Qt::black);
-
-            QBrush gradientBrush{gradient};
-            gradientBrush.setStyle(Qt::BrushStyle::LinearGradientPattern);
-            painter.setBrush(gradientBrush);
-            painter.drawRect(pinRect);
-
-            xOffset += imageWidth / columns;
         }
     }
     return true;
@@ -201,112 +204,156 @@ bool makeACTImpl(QImage& image, int rows, int columns)
            drawACTColumns(painter, image.width(), image.height(), rows, columns);
 }
 
-
 //////////////////////////// ALIGN BAR
+void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int gridColumns, int barIndex, int barSize)
+{
+    const qreal fontPixelSize = qMax(10.0, qMin(boundingRect.width() / gridColumns, boundingRect.height() / gridRows));
+    const qreal gridCellWidth = boundingRect.width() / gridColumns;
+    const qreal gridCellHeight = (boundingRect.height() - fontPixelSize) / gridRows;
+    const qreal penWidth = 1.0;
+    QFont font {"Arrial"};
+    font.setPixelSize(fontPixelSize);
+
+    const QString str = QString::number(barIndex);
+    const QSizeF textSize = QFontMetrics{font}.size(Qt::TextSingleLine, str);
+    qreal xCell = 0;
+    qreal yCell = 0;
+
+    // map cell width
+    auto mcw = [gridWidth = boundingRect.width()](qreal w) {
+        return qMin(gridWidth, w);
+    };
+
+    // draw grid cells with background
+    for (int k = 0; k < gridRows; ++k) {
+        xCell = boundingRect.x();
+        yCell = boundingRect.y() + k * gridCellHeight;
+
+        // draw cell background
+        painter.setPen(QPen{});
+
+        // draw colored 1.5 cels
+        if (k == 0) {
+            painter.setBrush(QColor{83, 177, 54});
+
+            if (barIndex == 0) { // 1.5 + half
+                painter.drawRect(QRectF{boundingRect.x(),
+                                        boundingRect.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
+
+                painter.drawRect(QRectF{boundingRect.x() + boundingRect.width() - gridCellWidth / 2,
+                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
+            } else if (barIndex + 1 >= barSize) { // half + 1.5
+                painter.drawRect(QRectF{boundingRect.x() + (gridColumns - 1) * gridCellWidth - gridCellWidth / 2,
+                                        boundingRect.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
+
+                painter.drawRect(QRectF{boundingRect.x(),
+                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
+            } else { // two big
+                painter.drawRect(QRectF{boundingRect.x() + (barIndex - 1) * gridCellWidth + gridCellWidth / 2,
+                                        boundingRect.y(), gridCellWidth * 2, gridCellHeight});
+            }
+        } else { // one colored cell
+            painter.setBrush(QColor{117, 251, 76});
+            QRectF rect {boundingRect.x() + (barIndex) * gridCellWidth, yCell, gridCellWidth, gridCellHeight};
+            painter.drawRect(rect);
+
+            QRectF textRect = {rect.bottomLeft(), textSize};
+            textRect.moveCenter(QPointF{rect.center().x(),  textRect.center().y()});
+            textRect.setX(qBound(boundingRect.left(), textRect.x(), boundingRect.right() - textSize.width()));
+
+            painter.setFont(font);
+            painter.setPen(painter.brush().color());
+            painter.drawText(textRect, Qt::AlignHCenter|Qt::AlignTop, str);
+        }
+
+        for (int z = 0; z < gridColumns; ++z) {
+            // draw grid cells
+            painter.setBrush(QBrush{Qt::transparent});
+            painter.setPen(QPen{QBrush{QColor{122, 122, 122}}, penWidth});
+            // draw two half cells
+            if (k == 0 && z == 0) {
+                painter.drawRect(QRectF{boundingRect.x(),
+                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
+
+                painter.drawRect(QRectF{boundingRect.x() + (gridColumns - 1) * gridCellWidth + gridCellWidth / 2,
+                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
+
+                xCell += gridCellWidth / 2;
+                continue;
+            }
+
+            painter.drawRect(QRectF{xCell, yCell, gridCellWidth, gridCellHeight});
+            xCell += gridCellWidth;
+        }
+    }
+}
+
+void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSize)
+{
+    const qreal rows = 3;
+    const qreal columns = 3;
+    qreal xOffset = 0;
+    qreal yOffset = 0;
+
+    const int gridRows = 2;
+    const int gridColumns = barSize;
+    qreal margin = qMax(10.0, qMin(boundRect.height() / rows, boundRect.width() / columns) / 20 );
+
+    const qreal tileHeight = boundRect.height() / rows - margin * 2;
+    const qreal tileWidth = boundRect.width() / columns - margin * 2;
+    const qreal gridWidth = qMax(tileWidth * 0.75, 12.0 * gridColumns);
+    const qreal gridHeight = qMax(tileHeight * 0.75, 50.0 * gridRows);
+
+    for (size_t i = 0; i < rows; ++i) {
+        yOffset = i * boundRect.height() / (rows - 1) + boundRect.y();
+
+        for (size_t j = 0; j < columns; ++j) {
+            xOffset = j * boundRect.width() / (columns - 1) + boundRect.x();
+
+            QRectF gridRect {
+                            qBound(boundRect.left() + margin, xOffset - gridWidth / 2 , boundRect.right() - gridWidth - margin),
+                            qBound(boundRect.top() + margin, yOffset - gridHeight / 2, boundRect.bottom() - gridHeight - margin),
+                            gridWidth, gridHeight};
+
+            drawAbarGrid(painter, gridRect, gridRows, gridColumns, barIndex, barSize);
+        }
+    }
+}
 
 bool makeABarImpl(QImage& image, int rows, int columns)
 {
+    image.fill(Qt::black);
     QPainter painter;
     if (image.width() <= 0 || image.height() <= 0 || rows <= 0 || columns <= 0 ||
         !painter.begin(&image)) {
         return false;
     }
 
-    const int gridRows = 2;
-    const int gridColumns = rows * columns;
     const qreal tileHeight = static_cast<qreal>(image.height()) / rows;
     const qreal tileWidth = static_cast<qreal>(image.width()) / columns;
-    const qreal gridWidth = qMin(tileWidth * 0.75, 12.0 * gridColumns);
-    const qreal gridHeight = qMin(tileHeight * 0.75, 50.0 * gridRows);
-    const qreal gridCellWidth = gridWidth / gridColumns;
-    const qreal gridCellHeight = gridHeight / gridRows;
-    const qreal penWidth = 1.0; //qMax(1.0, qMin(gridCellWidth, gridCellHeight) / qMax(gridRows, gridColumns));
-    QFont font {"Arrial", 20};
 
-    qreal xCenter = 0;
-    qreal yCenter = 0;
-    QPointF gridTopLeft;
-    qreal xCell = 0;
-    qreal yCell = 0;
+    qreal xOffset = 0;
+    qreal yOffset = 0;
     int value = 0;
 
-    // map cell width
-    auto mcw = [gridWidth](qreal w) {
-        return qMin(gridWidth, w);
-    };
-
     for (int i = 0; i < rows; ++i) {
-        yCenter = tileHeight * i + tileHeight / 2;
+        yOffset = tileHeight * i;
 
         for (int j = 0; j < columns; ++j) {
-            xCenter = tileWidth * j + tileWidth / 2;
-            gridTopLeft = QPointF{xCenter - gridWidth / 2, yCenter - gridHeight / 2};
-
-            // draw grid cells with background
-            for (int k = 0; k < gridRows; ++k) {
-                xCell = gridTopLeft.x();
-                yCell = gridTopLeft.y() + k * gridCellHeight;
-
-                // draw cell background
-                painter.setPen(QPen{});
-
-                // draw colored 1.5 cels
-                if (k == 0) {
-                    painter.setBrush(QColor{83, 177, 54});
-
-                    if (i == 0 && j == 0) { // 1.5 + half
-                        painter.drawRect(QRectF{gridTopLeft.x(),
-                                                gridTopLeft.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
-
-                        painter.drawRect(QRectF{gridTopLeft.x() + gridWidth - gridCellWidth / 2,
-                                                gridTopLeft.y(), gridCellWidth / 2, gridCellHeight});
-                    } else if (i == rows - 1 && j == columns - 1) { // half + 1.5
-                        painter.drawRect(QRectF{gridTopLeft.x() + (gridColumns - 1) * gridCellWidth - gridCellWidth / 2,
-                                                gridTopLeft.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
-
-                        painter.drawRect(QRectF{gridTopLeft.x(),
-                                                gridTopLeft.y(), gridCellWidth / 2, gridCellHeight});
-                    } else { // two big
-                        painter.drawRect(QRectF{gridTopLeft.x() + (i * columns + j - 1) * gridCellWidth + gridCellWidth / 2,
-                                                gridTopLeft.y(), gridCellWidth * 2, gridCellHeight});
-                    }
-                } else { // one colored cell
-                    painter.setBrush(QColor{117, 251, 76});
-                    QRectF rect {gridTopLeft.x() + (i * columns + j) * gridCellWidth, yCell, gridCellWidth, gridCellHeight};
-                    painter.drawRect(rect);
-
-
-                    QString str = QString::number(value++);
-                    QRectF textRect = {rect.bottomLeft(), QFontMetrics{font}.size(Qt::TextSingleLine, str)};
-                    textRect.moveCenter(QPointF{rect.center().x(),  textRect.center().y()});
-                    painter.setFont(font);
-                    painter.setPen(painter.brush().color());
-                    painter.drawText(textRect, Qt::AlignHCenter|Qt::AlignTop, str);
-                }
-
-                for (int z = 0; z < gridColumns; ++z) {
-                    // draw grid cells
-                    painter.setBrush(QBrush{Qt::transparent});
-                    painter.setPen(QPen{QBrush{QColor{122, 122, 122}}, penWidth});
-                    // draw two half cells
-                    if (k == 0 && z == 0) {
-                        painter.drawRect(QRectF{gridTopLeft.x(),
-                                                gridTopLeft.y(), gridCellWidth / 2, gridCellHeight});
-
-                        painter.drawRect(QRectF{gridTopLeft.x() + (gridColumns - 1) * gridCellWidth + gridCellWidth / 2,
-                                                gridTopLeft.y(), gridCellWidth / 2, gridCellHeight});
-
-                        xCell += gridCellWidth / 2;
-                        continue;
-                    }
-
-                    painter.drawRect(QRectF{xCell, yCell, gridCellWidth, gridCellHeight});
-                    xCell += gridCellWidth;
-                }
-            }
+            xOffset = tileWidth * j;
+            drawAbarMatrix(painter, QRectF{xOffset, yOffset, tileWidth, tileHeight}, value++, rows * columns);
         }
     }
     return true;
+}
+
+std::vector<QImage> splitImage(const QImage& image, qreal tileWidth, qreal tileHeight, int number)
+{
+    std::vector<QImage> result;
+    for (int i = 0; i < number; ++i) {
+        result.emplace_back(image.copy(tileWidth * i, 0, tileWidth, tileHeight));
+    }
+    return result;
 }
 
 } // namespace
@@ -335,9 +382,35 @@ bool CalibrationFactory::makeACT(const QString &filePath, int imageWidth, int im
 bool CalibrationFactory::makeABar(const QString &filePath, int imageWidth, int imageHeight, int rows, int columns)
 {
     QImage image {imageWidth, imageHeight,  QImage::Format_ARGB32};
-    image.fill(Qt::black);
     if (!makeABarImpl(image, rows, columns)) {
         return false;
     }
     return image.save(filePath);
+}
+
+std::vector<QImage> CalibrationFactory::getPattern(CalibrationFactory::PatternType type, int width, int height, int number)
+{
+    if (width <= 0 || height <= 0 || number <= 0) {
+        return {};
+    }
+
+    QImage image {width * number, height,  QImage::Format_ARGB32};
+    image.fill(Qt::transparent);
+    switch (type) {
+        case CalibrationFactory::RGB:
+            makeRGBImpl(image, 1, number);
+            break;
+
+        case CalibrationFactory::ALIGN_BAR:
+            makeABarImpl(image, 1, number);
+            break;
+
+        case CalibrationFactory::ACT:
+            makeACTImpl(image, 1, number);
+            break;
+
+        default: return {};
+    }
+
+    return splitImage(image, width, height, number);
 }
