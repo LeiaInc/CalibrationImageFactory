@@ -136,6 +136,8 @@ bool drawACTRows(QPainter& painter, qreal imageWidth, qreal imageHeight, int row
     const auto colorsSet = getColorsSet(ACT_SET, coloredRowsNumber);
     const qreal height = imageHeight / coloredRowsNumber;
     qreal yOffset = 0;
+    painter.setPen(Qt::transparent);
+
     for (const auto& color : colorsSet) {
         painter.setBrush(QBrush{color});
         painter.drawRect(QRectF{0, yOffset, imageWidth, height});
@@ -165,6 +167,8 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     qreal yOffset = 0;
     qreal xOffset = lbound * imageWidth / columns;
     unsigned counter = 0;
+
+    painter.setPen(Qt::transparent);
 
     for (int i = 0; i < rows; ++i) {
         yOffset = i * stripeHeight * ACT_SET.size();
