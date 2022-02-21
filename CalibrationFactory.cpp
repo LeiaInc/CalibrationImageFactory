@@ -244,7 +244,7 @@ void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int grid
                 painter.drawRect(QRectF{boundingRect.x(),
                                         boundingRect.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
 
-                painter.drawRect(QRectF{boundingRect.x() + boundingRect.width() - gridCellWidth / 2,
+                painter.drawRect(QRectF{boundingRect.x() + gridCellWidth / 2 + (gridColumns - 1) * gridCellWidth,
                                         boundingRect.y(), gridCellWidth / 2, gridCellHeight});
             } else if (barIndex + 1 >= barSize) { // half + 1.5
                 painter.drawRect(QRectF{boundingRect.x() + (gridColumns - 1) * gridCellWidth - gridCellWidth / 2,
@@ -301,26 +301,29 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
 
     const int gridRows = 2;
     const int gridColumns = barSize;
-    qreal margin = qMax(10.0, qMin(boundRect.height() / rows, boundRect.width() / columns) / 20 );
+    const qreal tileHeight = boundRect.height() / rows / 4;
+    const qreal tileWidth = boundRect.width() / columns / 4;
 
-    const qreal tileHeight = boundRect.height() / rows - margin * 2;
-    const qreal tileWidth = boundRect.width() / columns - margin * 2;
-    const qreal gridWidth = qMax(tileWidth * 0.75, 12.0 * gridColumns);
-    const qreal gridHeight = qMax(tileHeight * 0.75, 50.0 * gridRows);
+    qreal margin = qMax(10.0, qMin(tileHeight, tileWidth));
+
+    const qreal gridWidth = qMin(tileWidth, 12.0 * gridColumns);
+    const qreal gridHeight = qMin(tileHeight, 50.0 * gridRows);
+
+    QRectF matrixRect;
+    matrixRect.setWidth(margin * (columns - 1) + gridWidth * columns);
+    matrixRect.setHeight(margin * (rows - 1) + gridHeight * rows);
+    matrixRect.moveCenter(boundRect.center());
 
     for (size_t i = 0; i < rows; ++i) {
-        yOffset = i * boundRect.height() / (rows - 1) + boundRect.y();
-
+        xOffset = 0;
         for (size_t j = 0; j < columns; ++j) {
-            xOffset = j * boundRect.width() / (columns - 1) + boundRect.x();
-
-            QRectF gridRect {
-                            qBound(boundRect.left() + margin, xOffset - gridWidth / 2 , boundRect.right() - gridWidth - margin),
-                            qBound(boundRect.top() + margin, yOffset - gridHeight / 2, boundRect.bottom() - gridHeight - margin),
+            QRectF gridRect {matrixRect.left() + xOffset, matrixRect.top() + yOffset,
                             gridWidth, gridHeight};
 
             drawAbarGrid(painter, gridRect, gridRows, gridColumns, barIndex, barSize);
+            xOffset += margin + gridWidth;
         }
+        yOffset += margin + gridHeight;
     }
 }
 
