@@ -152,11 +152,11 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
         return false;
     }
 
-    const qreal widthRatio = 0.75;
+    const qreal widthRatio = 1;
     const qreal imageWidthScaled = imageWidth * widthRatio;
     const qreal windowOffset = (imageWidth - imageWidthScaled) / 2;
 
-    const qreal pinWidth = 20;
+    const qreal pinWidth = 10;
     const qreal pinWidthHalf = pinWidth / 2;
     const qreal pinHeightRatio = 0.45;
     const int stripesNumber = rows * ACT_SET.size();
@@ -164,9 +164,9 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     const qreal pinHeight = stripeHeight * pinHeightRatio;
     const qreal pinYOffset = stripeHeight * (1 - pinHeightRatio) / 2;
 
-    const qreal lbound = 0.45;
+    const qreal lbound = 0.40;
     const qreal ubound = 0.55;
-    const qreal hDelta = (imageWidthScaled - pinWidth * 2) / columns * (ubound - lbound) / (rows * columns);
+    const qreal hDelta = imageWidthScaled * (ubound - lbound) / (rows * columns) / (rows * columns);
 
     qreal yOffset = 0;
     qreal xOffset = 0;
@@ -305,17 +305,16 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
 
     const int gridRows = 2;
     const int gridColumns = barSize;
-    const qreal tileHeight = boundRect.height() / rows / 4;
-    const qreal tileWidth = boundRect.width() / columns / 4;
-
-    qreal margin = qMax(10.0, qMin(tileHeight, tileWidth));
+    const qreal tileHeight = boundRect.height() / rows;
+    const qreal tileWidth = boundRect.width() / columns;
 
     const qreal gridWidth = qMin(tileWidth, 12.0 * gridColumns);
     const qreal gridHeight = qMin(tileHeight, 50.0 * gridRows);
 
+    const qreal sideMargin = 10;
     QRectF matrixRect;
-    matrixRect.setWidth(margin * (columns - 1) + gridWidth * columns);
-    matrixRect.setHeight(margin * (rows - 1) + gridHeight * rows);
+    matrixRect.setWidth(boundRect.width() - sideMargin * 2);
+    matrixRect.setHeight(boundRect.height() - sideMargin * 2);
     matrixRect.moveCenter(boundRect.center());
 
     for (size_t i = 0; i < rows; ++i) {
@@ -324,10 +323,22 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
             QRectF gridRect {matrixRect.left() + xOffset, matrixRect.top() + yOffset,
                             gridWidth, gridHeight};
 
+            if (j == columns - 1) {
+                gridRect.moveRight(matrixRect.right());
+            } else if (j != 0) {
+                gridRect.moveLeft(gridRect.left() - gridRect.width() / 2);
+            }
+
+            if (i == rows - 1) {
+                gridRect.moveBottom(matrixRect.bottom());
+            } else if (i != 0) {
+                gridRect.moveTop(gridRect.top() - gridRect.height() / 2);
+            }
+
             drawAbarGrid(painter, gridRect, gridRows, gridColumns, barIndex, barSize);
-            xOffset += margin + gridWidth;
+            xOffset += matrixRect.width() / (columns - 1);
         }
-        yOffset += margin + gridHeight;
+        yOffset += matrixRect.height() / (rows - 1);
     }
 }
 
