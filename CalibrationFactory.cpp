@@ -165,8 +165,8 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     const qreal pinYOffset = stripeHeight * (1 - pinHeightRatio) / 2;
 
     const qreal lbound = 0.40;
-    const qreal ubound = 0.55;
-    const qreal hDelta = imageWidthScaled * (ubound - lbound) / (rows * columns) / (rows * columns);
+//    const qreal ubound = 0.55;
+    const qreal hDelta = pinWidth + 2;
 
     qreal yOffset = 0;
     qreal xOffset = 0;
