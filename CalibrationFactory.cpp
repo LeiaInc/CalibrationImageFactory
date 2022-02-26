@@ -152,10 +152,6 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
         return false;
     }
 
-    const qreal widthRatio = 1;
-    const qreal imageWidthScaled = imageWidth * widthRatio;
-    const qreal windowOffset = (imageWidth - imageWidthScaled) / 2;
-
     const qreal pinWidth = 10;
     const qreal pinWidthHalf = pinWidth / 2;
     const qreal pinHeightRatio = 0.45;
@@ -164,9 +160,8 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     const qreal pinHeight = stripeHeight * pinHeightRatio;
     const qreal pinYOffset = stripeHeight * (1 - pinHeightRatio) / 2;
 
-    const qreal lbound = 0.40;
-//    const qreal ubound = 0.55;
     const qreal hDelta = pinWidth + 2;
+    const qreal leftPos = imageWidth / columns / 2 - hDelta * (columns * rows - 1) / 2;
 
     qreal yOffset = 0;
     qreal xOffset = 0;
@@ -178,8 +173,8 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
         yOffset = i * stripeHeight * ACT_SET.size();
 
         for(int j = 0; j < columns; ++j) {
-            xOffset = windowOffset + lbound * imageWidthScaled / columns + counter++ * hDelta + j * imageWidthScaled / columns;
-            const qreal xPos = qBound(windowOffset + pinWidthHalf, xOffset, windowOffset + imageWidthScaled - pinWidthHalf);
+            xOffset = leftPos + counter++ * hDelta + j * imageWidth / columns;
+            const qreal xPos = qBound(pinWidthHalf, xOffset, imageWidth - pinWidthHalf);
 
             for (int k = 0; k < static_cast<int>(ACT_SET.size()); ++k) {
                 painter.setBrush(QBrush{QColor{0, 255, 0}});
