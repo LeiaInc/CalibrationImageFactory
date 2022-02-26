@@ -160,7 +160,9 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     const qreal pinHeight = stripeHeight * pinHeightRatio;
     const qreal pinYOffset = stripeHeight * (1 - pinHeightRatio) / 2;
 
-    const qreal hDelta = pinWidth + 2;
+    const qreal pinsHSpace = 2;
+    const qreal pinsVSpace = stripeHeight * 0.05;
+    const qreal hDelta = pinWidth + pinsHSpace;
     const qreal leftPos = imageWidth / columns / 2 - hDelta * (columns * rows - 1) / 2;
 
     qreal yOffset = 0;
@@ -177,8 +179,15 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
             const qreal xPos = qBound(pinWidthHalf, xOffset, imageWidth - pinWidthHalf);
 
             for (int k = 0; k < static_cast<int>(ACT_SET.size()); ++k) {
+                qreal yPinPos = yOffset + pinYOffset + stripeHeight * k;
+                if (k == 0) {
+                    yPinPos = yOffset + stripeHeight - pinHeight - pinsVSpace;
+                } else if (k == static_cast<int>(ACT_SET.size()) - 1) {
+                    yPinPos = yOffset + pinsVSpace + stripeHeight * k;
+                }
+
                 painter.setBrush(QBrush{QColor{0, 255, 0}});
-                QRectF pinRect{xPos - pinWidthHalf, yOffset + pinYOffset + stripeHeight * k, pinWidth, pinHeight};
+                QRectF pinRect{xPos - pinWidthHalf, yPinPos, pinWidth, pinHeight};
                 painter.drawRect(pinRect);
 
                 QLinearGradient gradient {pinRect.topLeft(), pinRect.bottomRight()};
