@@ -217,7 +217,7 @@ bool makeACTImpl(QImage& image, int rows, int columns)
 }
 
 //////////////////////////// ALIGN BAR
-void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int gridColumns, int barIndex, int barSize)
+void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int gridColumns, int barIndex)
 {
     const qreal fontPixelSize = qMax(10.0, qMin(boundingRect.width() / gridColumns, boundingRect.height() / gridRows));
     const qreal gridCellWidth = boundingRect.width() / gridColumns;
@@ -231,14 +231,9 @@ void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int grid
     qreal xCell = 0;
     qreal yCell = 0;
 
-    // map cell width
-    auto mcw = [gridWidth = boundingRect.width()](qreal w) {
-        return qMin(gridWidth, w);
-    };
-
     // draw grid cells with background
     for (int k = 0; k < gridRows; ++k) {
-        xCell = boundingRect.x();
+        xCell = k == 0 ? boundingRect.x() + gridCellWidth / 2 : boundingRect.x();
         yCell = boundingRect.y() + k * gridCellHeight;
 
         // draw cell background
@@ -248,25 +243,20 @@ void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int grid
         if (k == 0) {
             painter.setBrush(QColor{83, 177, 54});
 
-            if (barIndex == 0) { // 1.5 + half
-                painter.drawRect(QRectF{boundingRect.x(),
-                                        boundingRect.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
+            // both cases (i - 0.5) % n
+            if (barIndex == 0) { // 0.5 + n.5
+                painter.drawRect(QRectF{xCell,
+                                        boundingRect.y(), gridCellWidth, gridCellHeight});
 
-                painter.drawRect(QRectF{boundingRect.x() + gridCellWidth / 2 + (gridColumns - 1) * gridCellWidth,
-                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
-            } else if (barIndex + 1 >= barSize) { // half + 1.5
-                painter.drawRect(QRectF{boundingRect.x() + (gridColumns - 1) * gridCellWidth - gridCellWidth / 2,
-                                        boundingRect.y(), mcw(gridCellWidth / 2 + gridCellWidth), gridCellHeight});
-
-                painter.drawRect(QRectF{boundingRect.x(),
-                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
+                painter.drawRect(QRectF{xCell + (gridColumns - 1) * gridCellWidth,
+                                        boundingRect.y(), gridCellWidth, gridCellHeight});
             } else { // two big
-                painter.drawRect(QRectF{boundingRect.x() + (barIndex - 1) * gridCellWidth + gridCellWidth / 2,
+                painter.drawRect(QRectF{xCell + (barIndex - 1) * gridCellWidth,
                                         boundingRect.y(), gridCellWidth * 2, gridCellHeight});
             }
         } else { // one colored cell
             painter.setBrush(QColor{117, 251, 76});
-            QRectF rect {boundingRect.x() + (barIndex) * gridCellWidth, yCell, gridCellWidth, gridCellHeight};
+            QRectF rect {xCell + (barIndex) * gridCellWidth, yCell, gridCellWidth, gridCellHeight};
             painter.drawRect(rect);
 
             QRectF textRect = {rect.bottomLeft(), textSize};
@@ -282,18 +272,6 @@ void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int grid
             // draw grid cells
             painter.setBrush(QBrush{Qt::transparent});
             painter.setPen(QPen{QBrush{QColor{122, 122, 122}}, penWidth});
-            // draw two half cells
-            if (k == 0 && z == 0) {
-                painter.drawRect(QRectF{boundingRect.x(),
-                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
-
-                painter.drawRect(QRectF{boundingRect.x() + (gridColumns - 1) * gridCellWidth + gridCellWidth / 2,
-                                        boundingRect.y(), gridCellWidth / 2, gridCellHeight});
-
-                xCell += gridCellWidth / 2;
-                continue;
-            }
-
             painter.drawRect(QRectF{xCell, yCell, gridCellWidth, gridCellHeight});
             xCell += gridCellWidth;
         }
@@ -315,7 +293,7 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
     const qreal gridWidth = qMin(tileWidth, 12.0 * gridColumns);
     const qreal gridHeight = qMin(tileHeight, 50.0 * gridRows);
 
-    const qreal sideMargin = 10;
+    const qreal sideMargin = 40;
     QRectF matrixRect;
     matrixRect.setWidth(boundRect.width() - sideMargin * 2);
     matrixRect.setHeight(boundRect.height() - sideMargin * 2);
@@ -339,7 +317,7 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
                 gridRect.moveTop(gridRect.top() - gridRect.height() / 2);
             }
 
-            drawAbarGrid(painter, gridRect, gridRows, gridColumns, barIndex, barSize);
+            drawAbarGrid(painter, gridRect, gridRows, gridColumns, barIndex);
             xOffset += matrixRect.width() / (columns - 1);
         }
         yOffset += matrixRect.height() / (rows - 1);
