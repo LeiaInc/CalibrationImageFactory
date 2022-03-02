@@ -3,6 +3,7 @@
 #include "CalibrationFactory.h"
 
 #include <QDebug>
+#include <QFileInfo>
 
 namespace Keywords {
     const QString t = "t";
@@ -22,8 +23,9 @@ enum class PatternType {
 };
 
 struct SizeParams {
-    int rows = 0;
-    int columns = 0;
+    int rows = -1;
+    int columns = -1;
+    int viewsNumber = -1;
 };
 
 bool tryParsePattern(const QString& str, const QString& expectedPrefix, SizeParams& size) {
@@ -31,12 +33,18 @@ bool tryParsePattern(const QString& str, const QString& expectedPrefix, SizePara
         return false;
     }
 
+    bool ok = true;
+    const int viewsNumber = str.mid(expectedPrefix.size()).toInt(&ok);
+    if (ok && viewsNumber > 0) {
+        size.viewsNumber = viewsNumber;
+        return true;
+    }
+
     QStringList args = str.mid(expectedPrefix.size()).split("x", Qt::SkipEmptyParts);
     if (args.size() != 2) {
         return false;
     }
 
-    bool ok = true;
     size.columns = args.at(0).toInt(&ok);
     if (!ok || size.columns <= 0) {
         return false;
@@ -58,6 +66,24 @@ PatternType getPatternType(const QString& str, SizeParams& size) {
         }
     }
     return PatternType::UNKNOWN;
+}
+
+void makeViews(const QString& baseName, const std::vector<QImage>& images)
+{
+    QFileInfo info {baseName};
+    const char DOT = '.';
+
+
+    const QString extension = info.completeSuffix().size() > 0 ? DOT + info.completeSuffix() : "";
+
+    for (size_t i = 0; i < images.size(); ++i)
+    {
+        QString imageName = baseName.mid(0, baseName.size() - extension.size()) +
+                QString::number(i) + extension;
+
+        images[i].save(imageName);
+        qDebug() << "Success. Please find image at " << imageName;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -102,6 +128,14 @@ int main(int argc, char *argv[])
     const QString filePath = parser.positionalArguments().at(0);
     SizeParams size;
     auto type = getPatternType(parser.value(Keywords::t), size);
+    if (size.viewsNumber > 0 && type != PatternType::UNKNOWN) {
+        makeViews(filePath, CalibrationFactory::getPattern(
+             static_cast<CalibrationFactory::PatternType>(type),
+                      width, height, size.viewsNumber));
+
+        return EXIT_SUCCESS;
+    }
+
     switch (type) {
         case PatternType::ACT:
             if (!CalibrationFactory::makeACT(filePath, width, height, size.rows, size.columns)) {
