@@ -17,6 +17,7 @@ struct CalibrationFactory
     static bool makeRGB(const QString& filePath, int imageWidth, int imageHeight, int rows, int columns);
     static bool makeACT(const QString& filePath, int imageWidth, int imageHeight, int rows, int columns);
     static bool makeABar(const QString& filePath, int imageWidth, int imageHeight, int rows, int columns);
+    static bool makePattern(PatternType type, const QString& filePath, int imageWidth, int imageHeight, int rows, int columns);
 
     /**
      * @brief getPattern - provides 'number' images of size 'width' x 'height'

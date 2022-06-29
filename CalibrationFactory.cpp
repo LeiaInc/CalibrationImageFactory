@@ -155,7 +155,7 @@ bool drawACTColumns(QPainter& painter, qreal imageWidth, qreal imageHeight, int 
     const qreal pinWidth = 10;
     const qreal pinWidthHalf = pinWidth / 2;
     const qreal pinHeightRatio = 0.45;
-    const int stripesNumber = rows * ACT_SET.size();
+    const int stripesNumber = rows * static_cast<int>(ACT_SET.size());
     const qreal stripeHeight = imageHeight / stripesNumber;
     const qreal pinHeight = stripeHeight * pinHeightRatio;
     const qreal pinYOffset = stripeHeight * (1 - pinHeightRatio) / 2;
@@ -219,9 +219,10 @@ bool makeACTImpl(QImage& image, int rows, int columns)
 //////////////////////////// ALIGN BAR
 void drawAbarGrid(QPainter& painter, QRectF boundingRect, int gridRows, int gridColumns, int barIndex)
 {
+    const qreal text2BoundingRectMargin = 5;
     const qreal fontPixelSize = qMax(10.0, qMin(boundingRect.width() / gridColumns, boundingRect.height() / gridRows));
     const qreal gridCellWidth = boundingRect.width() / gridColumns;
-    const qreal gridCellHeight = (boundingRect.height() - fontPixelSize) / gridRows;
+    const qreal gridCellHeight = (boundingRect.height() - fontPixelSize - text2BoundingRectMargin) / gridRows;
     const qreal penWidth = 1.0;
     QFont font {"Arrial"};
     font.setPixelSize(fontPixelSize);
@@ -285,19 +286,19 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
     qreal xOffset = 0;
     qreal yOffset = 0;
 
-    const int gridRows = 2;
-    const int gridColumns = barSize;
-    const qreal tileHeight = boundRect.height() / rows;
-    const qreal tileWidth = boundRect.width() / columns;
-
-    const qreal gridWidth = qMin(tileWidth, 12.0 * gridColumns);
-    const qreal gridHeight = qMin(tileHeight, 50.0 * gridRows);
-
     const qreal sideMargin = 40;
     QRectF matrixRect;
     matrixRect.setWidth(boundRect.width() - sideMargin * 2);
     matrixRect.setHeight(boundRect.height() - sideMargin * 2);
     matrixRect.moveCenter(boundRect.center());
+
+    const int gridRows = 2;
+    const int gridColumns = barSize;
+    const qreal tileHeight = matrixRect.height() / rows;
+    const qreal tileWidth = matrixRect.width() / columns;
+
+    const qreal gridWidth = qMin(tileWidth, 12.0 * gridColumns);
+    const qreal gridHeight = qMin(tileHeight, 50.0 * gridRows);
 
     for (size_t i = 0; i < rows; ++i) {
         xOffset = 0;
@@ -316,6 +317,7 @@ void drawAbarMatrix(QPainter& painter, QRectF boundRect, int barIndex, int barSi
             } else if (i != 0) {
                 gridRect.moveTop(gridRect.top() - gridRect.height() / 2);
             }
+
 
             drawAbarGrid(painter, gridRect, gridRows, gridColumns, barIndex);
             xOffset += matrixRect.width() / (columns - 1);
@@ -390,6 +392,28 @@ bool CalibrationFactory::makeABar(const QString &filePath, int imageWidth, int i
         return false;
     }
     return image.save(filePath);
+}
+
+bool CalibrationFactory::makePattern(CalibrationFactory::PatternType type, const QString &filePath, int imageWidth, int imageHeight, int rows, int columns)
+{
+    QImage image {imageWidth, imageHeight,  QImage::Format_ARGB32};
+    image.fill(Qt::transparent);
+
+    bool result{false};
+    switch (type)
+    {
+    case CalibrationFactory::RGB:
+        result = makeRGBImpl(image, rows, columns);
+        break;
+    case CalibrationFactory::ACT:
+        result = makeACTImpl(image, rows, columns);
+        break;
+    case CalibrationFactory::ALIGN_BAR:
+        result = makeABarImpl(image, rows, columns);
+        break;
+    }
+
+    return result && image.save(filePath);
 }
 
 std::vector<QImage> CalibrationFactory::getPattern(CalibrationFactory::PatternType type, int width, int height, int number)
